@@ -54,7 +54,7 @@ class PETestsYAMLGenerator:
 
         year_str = self._get_year(household_data)
 
-        state_name = household_data["households"]["your household"]["state_name"][year_str]
+        state_name = household_data["households"]["your household"]["state_name"][year_str].lower()
         household_type = self.detect_household_type(household_data)
 
         old_to_new_ids = self._map_person_ids(household_data["people"])
@@ -73,8 +73,7 @@ class PETestsYAMLGenerator:
                         "tax_unit_childcare_expenses": 0,
                         "premium_tax_credit": 0,
                         "local_income_tax": 0,
-                        "state_sales_tax": 0,
-                        f"{state_name.lower()}_use_tax": 0
+                        "state_sales_tax": 0
                     }
                 },
                 "spm_units": {
@@ -102,6 +101,10 @@ class PETestsYAMLGenerator:
             new_id = old_to_new_ids[old_id]
             config["input"]["people"][new_id] = self._generate_person_data(person_data, year_str)
 
+        if has_use_tax_units(state_name):
+            use_tax = f"{state_name.lower()}_use_tax"
+            config["input"]["tax_units"]["tax_unit"][use_tax] = 0
+
         return config
 
     def _map_person_ids(self, people_data: Dict[str, Any]) -> Dict[str, str]:
@@ -118,7 +121,6 @@ class PETestsYAMLGenerator:
             "state_supplement": 0,
             "wic": 0,
         }
-
 
     def _get_state_fips(self, state_name: str) -> int:
 
@@ -197,7 +199,6 @@ class PETestsYAMLGenerator:
 
         class FlowStyleRepresenter(NoAliasDumper):
             def represent_sequence(self, tag, sequence, flow_style=None):
-
                 if any(isinstance(item, str) and item.startswith('person') for item in sequence):
                     flow_style = True
                 return super().represent_sequence(tag, sequence, flow_style)
@@ -226,3 +227,8 @@ class PETestsYAMLGenerator:
                 )
 
         return file_path
+
+
+def has_use_tax_units(state) -> bool:
+    has_use_tax = ['pa', 'nc', 'ca', 'il', 'in', 'ok']
+    return state in has_use_tax
