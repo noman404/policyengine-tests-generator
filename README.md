@@ -2,7 +2,7 @@ A Python package for generating test cases for PolicyEngine simulations. This pa
 
 
 ```bash
-pip install PolicyEngine-tests-generator
+pip install -e .
 ```
 
 
@@ -10,3 +10,5 @@ To run it from cli
 ```bash
 python policyengine-tests-generator\main.py --input input\input.json --output test.yaml
 ```
+
+there will be an `output` dir with yaml test file in the `policyengine-tests-generator/output/`
