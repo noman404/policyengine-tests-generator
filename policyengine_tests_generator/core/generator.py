@@ -230,9 +230,9 @@ class PETestsYAMLGenerator:
 
         return file_path
 
-    def _get_yaml_file(self, data: Union[Dict[str, Any], List[Dict[str, Any]]]) -> str:
+    def _get_yaml(self, data: Union[Dict[str, Any], List[Dict[str, Any]]]) -> str:
         """
-        Generate YAML string from the data with custom representation handling.
+        Generate YAML string from the data with clean number formatting.
         """
 
         class CustomDumper(NoAliasDumper):
@@ -242,44 +242,33 @@ class PETestsYAMLGenerator:
                 return super().represent_sequence(tag, sequence, flow_style)
 
             def represent_float(self, data):
-                if np.isnan(data):
-                    return self.represent_scalar('tag:yaml.org,2002:str', 'NaN')
-                elif np.isinf(data):
-                    if data > 0:
-                        return self.represent_scalar('tag:yaml.org,2002:str', 'Infinity')
-                    else:
-                        return self.represent_scalar('tag:yaml.org,2002:str', '-Infinity')
-                else:
-                    return self.represent_scalar('tag:yaml.org,2002:float', f'{float(data):.10g}')
+                # Convert to regular float and represent directly
+                return self.represent_scalar('tag:yaml.org,2002:float', str(float(data)), style=None)
 
             def represent_int(self, data):
-                return self.represent_scalar('tag:yaml.org,2002:int', str(int(data)))
+                # Convert to regular int and represent directly
+                return self.represent_scalar('tag:yaml.org,2002:int', str(int(data)), style=None)
 
-        # Register representers for numeric types
+        # Register representers
         CustomDumper.add_representer(float, CustomDumper.represent_float)
         CustomDumper.add_representer(np.float64, CustomDumper.represent_float)
         CustomDumper.add_representer(np.float32, CustomDumper.represent_float)
         CustomDumper.add_representer(np.int64, CustomDumper.represent_int)
         CustomDumper.add_representer(np.int32, CustomDumper.represent_int)
 
-        # Handle special numeric types
-        def convert_special_numbers(obj):
+        def clean_data(obj):
             if isinstance(obj, (np.float32, np.float64, float)):
-                if np.isnan(obj):
-                    return 'NaN'
-                elif np.isinf(obj):
-                    return 'Infinity' if obj > 0 else '-Infinity'
                 return float(obj)
             elif isinstance(obj, (np.int32, np.int64)):
                 return int(obj)
             elif isinstance(obj, dict):
-                return {k: convert_special_numbers(v) for k, v in obj.items()}
+                return {k: clean_data(v) for k, v in obj.items()}
             elif isinstance(obj, list):
-                return [convert_special_numbers(i) for i in obj]
+                return [clean_data(i) for i in obj]
             return obj
 
-        # Preprocess the data
-        processed_data = convert_special_numbers(data)
+        # Clean the data
+        processed_data = clean_data(data)
 
         if isinstance(processed_data, list):
             return yaml.dump_all(
