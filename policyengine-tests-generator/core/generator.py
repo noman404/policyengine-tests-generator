@@ -49,7 +49,7 @@ class PETestsYAMLGenerator:
             self,
             household_data: Dict[str, Any],
             name: Optional[str] = None,
-            output_variable=0.0
+            pe_outputs: Any = None
     ) -> Dict[str, Any]:
 
         year_str = self._get_year(household_data)
@@ -92,10 +92,11 @@ class PETestsYAMLGenerator:
                     }
                 }
             },
-            "output": {
-                "income_tax": output_variable
-            }
+            "output": {}
         }
+
+        for item in pe_outputs:
+            config['output'][item['variable']] = item['value']
 
         for old_id, person_data in household_data["people"].items():
             new_id = old_to_new_ids[old_id]

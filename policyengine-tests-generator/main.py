@@ -10,9 +10,15 @@ def main():
         description="Generate YAML test cases for PolicyEngine"
     )
     parser.add_argument(
-        "--input",
+        "--household",
         type=str,
         help="Input JSON file containing household data",
+        required=True
+    )
+    parser.add_argument(
+        "--variables",
+        type=str,
+        help="Input JSON file containing variables output data",
         required=True
     )
     parser.add_argument(
@@ -32,15 +38,18 @@ def main():
 
     try:
 
-        with open(args.input, 'r') as f:
+        with open(args.household, 'r') as f:
             household_data = json.load(f)
+
+        with open(args.variables, 'r') as f:
+            variables = json.load(f)
 
         generator = PETestsYAMLGenerator()
 
         yaml_data = generator.generate_yaml(
             household_data=household_data,
             name=args.name,
-            output_variable=0.0
+            pe_outputs=variables
         )
 
         generator.save_yaml(yaml_data, args.output)
