@@ -42,7 +42,6 @@ class PETestsYAMLGenerator:
 
         if state_name_data:
             year, state = next(iter(state_name_data.items()))
-            print(f"Year: {year}, State: {state}")
 
         return str(year)
 
