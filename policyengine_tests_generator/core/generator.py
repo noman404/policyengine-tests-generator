@@ -97,7 +97,16 @@ class PETestsYAMLGenerator:
         }
 
         for item in pe_outputs:
-            config['output'][item['variable']] = item['value']
+            value = item['value']
+            if isinstance(value, (float, np.float32, np.float64)):
+                if value == 0 or value == 0.0:
+                    formatted_value = 0
+                else:
+                    formatted_value = round(float(value), 2)
+            else:
+                formatted_value = value
+
+            config['output'][item['variable']] = formatted_value
 
         for old_id, person_data in household_data["people"].items():
             new_id = old_to_new_ids[old_id]
