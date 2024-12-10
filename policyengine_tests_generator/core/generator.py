@@ -50,7 +50,7 @@ class PETestsYAMLGenerator:
             household_data: Dict[str, Any],
             name: Optional[str] = None,
             pe_outputs: Any = None
-    ) -> Dict[str, Any]:
+    ) -> List[Dict[str, Any]]:  # Changed return type to List[Dict]
 
         year_str = self._get_year(household_data)
 
@@ -61,6 +61,7 @@ class PETestsYAMLGenerator:
 
         members = [old_to_new_ids[m] for m in household_data["tax_units"]["your tax unit"]["members"]]
 
+        # Create the configuration
         config = {
             "name": name or f"Tax unit for {household_type} household ({year_str})",
             "absolute_error_margin": 0.01,
@@ -102,11 +103,15 @@ class PETestsYAMLGenerator:
             new_id = old_to_new_ids[old_id]
             config["input"]["people"][new_id] = self._generate_person_data(person_data, year_str)
 
-        if has_use_tax_units(state_name):
+        print(household_data)
+        match = any(f"{state_name}_use_tax" in key for key in household_data["tax_units"].keys())
+        print(match)
+        if any(f"{state_name}_use_tax" in key for key in household_data["tax_units"].keys()):
             use_tax = f"{state_name.lower()}_use_tax"
             config["input"]["tax_units"]["tax_unit"][use_tax] = 0
 
-        return config
+        # Return as a list containing the single config dictionary
+        return [config]
 
     def _map_person_ids(self, people_data: Dict[str, Any]) -> Dict[str, str]:
         return {
@@ -206,7 +211,7 @@ class PETestsYAMLGenerator:
 
         with open(file_path, 'w') as f:
             if isinstance(data, list):
-                yaml.dump_all(
+                yaml.dump(  # Changed from dump_all to dump since we're handling a single list
                     data,
                     f,
                     Dumper=FlowStyleRepresenter,
@@ -214,7 +219,7 @@ class PETestsYAMLGenerator:
                     sort_keys=False,
                     allow_unicode=True,
                     indent=2,
-                    explicit_start=True
+                    explicit_start=False  # Changed to False to remove the "---"
                 )
             else:
                 yaml.dump(
@@ -232,29 +237,64 @@ class PETestsYAMLGenerator:
     def _get_yaml(self, data: Union[Dict[str, Any], List[Dict[str, Any]]]) -> str:
         """
         Generate YAML string from the data with clean number formatting.
+        Returns a properly formatted string that can be directly written to file.
         """
 
-        class CustomDumper(NoAliasDumper):
-            def represent_sequence(self, tag, sequence, flow_style=None):
-                if any(isinstance(item, str) and item.startswith('person') for item in sequence):
-                    flow_style = True
-                return super().represent_sequence(tag, sequence, flow_style)
+        def clean_value(value):
+            """Format values appropriately for YAML string output"""
+            if isinstance(value, (np.float32, np.float64, float)):
+                # Convert to float and format, removing trailing zeros
+                return f"{float(value):g}"
+            elif isinstance(value, (np.int32, np.int64, int)):
+                return str(int(value))
+            elif isinstance(value, bool):
+                return str(value).lower()
+            elif isinstance(value, (list, tuple)):
+                if any(isinstance(item, str) and item.startswith('person') for item in value):
+                    # Format person lists in flow style: [person1, person2]
+                    items = ', '.join(str(clean_value(item)) for item in value)
+                    return f"[{items}]"
+                else:
+                    # Format other lists with normal indentation
+                    return [clean_value(item) for item in value]
+            return str(value)
 
-            def represent_float(self, data):
-                # Convert to regular float and represent directly
-                return self.represent_scalar('tag:yaml.org,2002:float', str(float(data)), style=None)
+        def format_item(key: str, value: Any, indent: int = 0) -> str:
+            """Format a key-value pair with proper indentation"""
+            indent_str = " " * indent
 
-            def represent_int(self, data):
-                # Convert to regular int and represent directly
-                return self.represent_scalar('tag:yaml.org,2002:int', str(int(data)), style=None)
+            if isinstance(value, dict):
+                lines = [f"{indent_str}{key}:"]
+                for k, v in value.items():
+                    lines.append(format_item(k, v, indent + 2))
+                return '\n'.join(lines)
+            elif isinstance(value, list) and not isinstance(value, str) and not any(
+                    isinstance(item, str) and item.startswith('person') for item in value):
+                lines = [f"{indent_str}{key}:"]
+                for item in value:
+                    if isinstance(item, dict):
+                        lines.extend([f"{indent_str}- " + format_item(k, v, indent + 2).lstrip()
+                                      for k, v in item.items()])
+                    else:
+                        lines.append(f"{indent_str}- {clean_value(item)}")
+                return '\n'.join(lines)
+            else:
+                clean_val = clean_value(value)
+                if isinstance(clean_val, str) and ('\n' in clean_val or ':' in clean_val):
+                    # Handle multiline strings or strings containing colons
+                    indent_str_content = " " * (indent + 2)
+                    lines = clean_val.split('\n')
+                    return f"{indent_str}{key}: |\n" + '\n'.join(f"{indent_str_content}{line}" for line in lines)
+                return f"{indent_str}{key}: {clean_val}"
 
-        # Register representers
-        CustomDumper.add_representer(float, CustomDumper.represent_float)
-        CustomDumper.add_representer(np.float64, CustomDumper.represent_float)
-        CustomDumper.add_representer(np.float32, CustomDumper.represent_float)
-        CustomDumper.add_representer(np.int64, CustomDumper.represent_int)
-        CustomDumper.add_representer(np.int32, CustomDumper.represent_int)
+        def format_dict(d: Dict[str, Any], base_indent: int = 0) -> str:
+            """Format an entire dictionary as YAML"""
+            lines = []
+            for key, value in d.items():
+                lines.append(format_item(key, value, base_indent))
+            return '\n'.join(lines)
 
+        # Clean the data first
         def clean_data(obj):
             if isinstance(obj, (np.float32, np.float64, float)):
                 return float(obj)
@@ -266,28 +306,19 @@ class PETestsYAMLGenerator:
                 return [clean_data(i) for i in obj]
             return obj
 
-        # Clean the data
+        # Process the data
         processed_data = clean_data(data)
 
+        # Generate the YAML string
         if isinstance(processed_data, list):
-            return yaml.dump_all(
-                processed_data,
-                Dumper=CustomDumper,
-                default_flow_style=False,
-                sort_keys=False,
-                allow_unicode=True,
-                indent=2,
-                explicit_start=True
-            )
+            # Handle list of dictionaries
+            yaml_lines = []
+            for item in processed_data:
+                yaml_lines.append("- " + format_dict(item, 2).lstrip())
+            return '\n'.join(yaml_lines)
         else:
-            return yaml.dump(
-                processed_data,
-                Dumper=CustomDumper,
-                default_flow_style=False,
-                sort_keys=False,
-                allow_unicode=True,
-                indent=2
-            )
+            # Handle single dictionary
+            return format_dict(processed_data)
 
 
 def has_use_tax_units(state) -> bool:
