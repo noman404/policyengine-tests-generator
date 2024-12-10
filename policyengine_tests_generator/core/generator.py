@@ -103,9 +103,6 @@ class PETestsYAMLGenerator:
             new_id = old_to_new_ids[old_id]
             config["input"]["people"][new_id] = self._generate_person_data(person_data, year_str)
 
-        print(household_data)
-        match = any(f"{state_name}_use_tax" in key for key in household_data["tax_units"].keys())
-        print(match)
         if any(f"{state_name}_use_tax" in key for key in household_data["tax_units"].keys()):
             use_tax = f"{state_name.lower()}_use_tax"
             config["input"]["tax_units"]["tax_unit"][use_tax] = 0
