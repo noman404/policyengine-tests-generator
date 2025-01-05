@@ -132,7 +132,7 @@ class PETestsYAMLGenerator:
             "ssi": 0,
             "state_supplement": 0,
             "wic": 0,
-            "deductible_mortgage_interest": person_data["deductible_mortgage_interest"].get(year, 0)
+            "deductible_mortgage_interest": person_data.get("deductible_mortgage_interest", {}).get(year, 0)
         }
 
     def _get_state_fips(self, state_name: str) -> int:
