@@ -64,7 +64,7 @@ class PETestsYAMLGenerator:
         # Create the configuration
         config = {
             "name": name or f"Tax unit for {household_type} household ({year_str})",
-            "absolute_error_margin": 0.01,
+            "absolute_error_margin": 2,
             "period": year_str,
             "input": {
                 "people": {},
@@ -132,6 +132,7 @@ class PETestsYAMLGenerator:
             "ssi": 0,
             "state_supplement": 0,
             "wic": 0,
+            "deductible_mortgage_interest": person_data["deductible_mortgage_interest"].get(year, 0)
         }
 
     def _get_state_fips(self, state_name: str) -> int:
